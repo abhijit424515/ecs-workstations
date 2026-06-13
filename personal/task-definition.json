@@ -9,9 +9,6 @@
       "memoryReservation": 1024,
       "cpu": 512,
       "environment": [
-        { "name": "HERMES_TELEGRAM_TOKEN", "value": "TELEGRAM_BOT_TOKEN" },
-        { "name": "DEEPSEEK_API_KEY", "value": "DEEPSEEK_API_KEY" },
-        { "name": "TELEGRAM_ALLOWED_USERS", "value": "1536460301" },
         { "name": "AWS_DEFAULT_REGION", "value": "ap-south-1" }
       ],
       "mountPoints": [

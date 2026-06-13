@@ -2,8 +2,8 @@
 # =============================================================================
 # ECS Workstation — Build & Deploy
 # =============================================================================
-# One-shot script: builds the workstation image, pushes to ECR, registers the
-# ECS task definition, and creates/updates the ECS service.
+# One-shot script: decrypts secrets, writes them to EBS, builds the image,
+# pushes to ECR, registers the ECS task definition, and deploys the service.
 #
 # Usage:
 #   ./build-and-deploy.sh <workstation>
@@ -15,12 +15,8 @@
 # Prerequisites:
 #   - AWS CLI logged in (correct profile)
 #   - Docker running
+#   - SOPS installed + KMS key access
 #   - ECR login done (aws ecr-public get-login-password ...)
-#
-# Environment variables (set before running):
-#   HERMES_TELEGRAM_TOKEN  — Telegram bot token
-#   DEEPSEEK_API_KEY       — Your DeepSeek API key
-#   AWS_PROFILE            — AWS profile (default: personal)
 # =============================================================================
 
 set -euo pipefail
@@ -38,11 +34,19 @@ if [ $# -lt 1 ]; then
 fi
 
 WORKSTATION="$1"
-WORKSTATION_DIR="$(cd "$(dirname "$0")" && pwd)/${WORKSTATION}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WORKSTATION_DIR="${SCRIPT_DIR}/${WORKSTATION}"
+SECRETS_FILE="${WORKSTATION_DIR}/secrets.yaml.sops"
 
 if [ ! -d "${WORKSTATION_DIR}" ]; then
     echo "ERROR: Workstation directory not found at ${WORKSTATION_DIR}"
     echo "Create it first with the required files (Dockerfile, task-definition.json, etc.)"
+    exit 1
+fi
+
+if [ ! -f "${SECRETS_FILE}" ]; then
+    echo "ERROR: Encrypted secrets file not found at ${SECRETS_FILE}"
+    echo "Create it with: cd ${WORKSTATION_DIR} && sops --encrypt secrets.yaml > secrets.yaml.sops"
     exit 1
 fi
 
@@ -57,30 +61,45 @@ SERVICE="${WORKSTATION}-devcontainer"
 TAG="$(date +%Y%m%d%H%M%S)"
 TASK_DEF_FILE="task-definition.json"
 AWS_PROFILE="${AWS_PROFILE:-personal}"
+EC2_INSTANCE="i-015b311587953daad"
 
 # ---------------------------------------------------------------------------
-# Validate required secrets
+# Step 1: Decrypt secrets and write to EBS
 # ---------------------------------------------------------------------------
-if [ -z "${HERMES_TELEGRAM_TOKEN:-}" ]; then
-    echo "ERROR: HERMES_TELEGRAM_TOKEN is not set."
-    echo "Get a token from @BotFather on Telegram and export it."
-    exit 1
-fi
+echo "=== Decrypting secrets ==="
+SECRETS_JSON=$(sops -d --input-type yaml --output-type json "${SECRETS_FILE}" 2>/dev/null)
 
-if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
-    echo "ERROR: DEEPSEEK_API_KEY is not set."
-    exit 1
-fi
+HERMES_ENV=$(echo "${SECRETS_JSON}" | jq -r '.hermes_env')
+AWS_CREDS=$(echo "${SECRETS_JSON}" | jq -r '.aws_credentials')
+
+echo "=== Writing secrets to EBS ==="
+aws ssm send-command \
+    --instance-ids "${EC2_INSTANCE}" \
+    --document-name "AWS-RunShellScript" \
+    --parameters "commands=[
+        \"mkdir -p /mnt/workstation/.hermes /mnt/workstation/.aws\",
+        \"cat > /mnt/workstation/.hermes/.env << 'ENVEOF'\n${HERMES_ENV}\nENVEOF\",
+        \"cat > /mnt/workstation/.aws/credentials << 'AWSEOF'\n${AWS_CREDS}\nAWSEOF\",
+        \"chown -R 1000:1000 /mnt/workstation/.hermes /mnt/workstation/.aws 2>/dev/null || true\",
+        \"chmod 600 /mnt/workstation/.aws/credentials /mnt/workstation/.hermes/.env\",
+        \"echo '=== verification ==='\",
+        \"ls -la /mnt/workstation/.hermes/.env /mnt/workstation/.aws/credentials\"
+    ]" \
+    --region ap-south-1 \
+    --profile "${AWS_PROFILE}" \
+    --output json > /dev/null
+
+echo "Secrets written to EBS."
 
 # ---------------------------------------------------------------------------
-# Step 1: Login to ECR (Public)
+# Step 2: Login to ECR (Public)
 # ---------------------------------------------------------------------------
 echo "=== Logging into ECR Public ==="
 aws ecr-public get-login-password --region us-east-1 --profile "${AWS_PROFILE}" \
     | docker login --username AWS --password-stdin public.ecr.aws
 
 # ---------------------------------------------------------------------------
-# Step 2: Create ECR repo if not exists
+# Step 3: Create ECR repo if not exists
 # ---------------------------------------------------------------------------
 echo "=== Ensuring ECR repo exists ==="
 aws ecr-public describe-repositories \
@@ -95,32 +114,30 @@ aws ecr-public describe-repositories \
         --output json
 
 # ---------------------------------------------------------------------------
-# Step 3: Build image
+# Step 4: Build image
 # ---------------------------------------------------------------------------
 echo "=== Building ${ECR_REPO}:${TAG} ==="
 docker build -t "${ECR_REPO}:${TAG}" -t "${ECR_REPO}:latest" .
 
 # ---------------------------------------------------------------------------
-# Step 4: Push to ECR
+# Step 5: Push to ECR
 # ---------------------------------------------------------------------------
 echo "=== Pushing to ECR ==="
 docker push "${ECR_REPO}:${TAG}"
 docker push "${ECR_REPO}:latest"
 
 # ---------------------------------------------------------------------------
-# Step 5: Prepare task definition (substitute WORKSTATION + env vars)
+# Step 6: Prepare task definition (substitute WORKSTATION + IMAGE_TAG)
 # ---------------------------------------------------------------------------
 echo "=== Preparing task definition ==="
 sed -e "s/WORKSTATION/${WORKSTATION}/g" \
     -e "s/IMAGE_TAG/${TAG}/g" \
-    -e "s/TELEGRAM_BOT_TOKEN/${HERMES_TELEGRAM_TOKEN}/g" \
-    -e "s/DEEPSEEK_API_KEY/${DEEPSEEK_API_KEY}/g" \
     "${TASK_DEF_FILE}" > /tmp/${WORKSTATION}-devcontainer-task-def.json
 
 echo "Task definition written to /tmp/${WORKSTATION}-devcontainer-task-def.json"
 
 # ---------------------------------------------------------------------------
-# Step 6: Register task definition
+# Step 7: Register task definition
 # ---------------------------------------------------------------------------
 echo "=== Registering task definition ==="
 aws ecs register-task-definition \
@@ -136,7 +153,7 @@ TASK_DEF_ARN=$(aws ecs describe-task-definition \
 echo "Registered: ${TASK_DEF_ARN}"
 
 # ---------------------------------------------------------------------------
-# Step 7: Create or update ECS service
+# Step 8: Create or update ECS service
 # ---------------------------------------------------------------------------
 echo "=== Checking for existing service ==="
 SERVICE_EXISTS=$(aws ecs describe-services \

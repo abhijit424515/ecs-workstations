@@ -4,3 +4,6 @@
 **/*.tfstate.backup
 **/plan.tfplan
 **/.terraform.lock.hcl
+
+# Secrets — plaintext files (encrypted .sops versions ARE committed)
+**/secrets.yaml
