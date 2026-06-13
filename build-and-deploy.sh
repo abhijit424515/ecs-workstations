@@ -140,8 +140,8 @@ docker push "${ECR_REPO}:latest"
 # Step 6: Prepare task definition (substitute WORKSTATION + IMAGE_TAG)
 # ---------------------------------------------------------------------------
 echo "=== Preparing task definition ==="
-sed -e "s/WORKSTATION/${WORKSTATION}/g" \
-    -e "s|WORKSTATION_PATH|${WORKSTATION_PATH}|g" \
+sed -e "s|WORKSTATION_PATH|${WORKSTATION_PATH}|g" \
+    -e "s|WORKSTATION|${WORKSTATION}|g" \
     -e "s/IMAGE_TAG/${TAG}/g" \
     "${TASK_DEF_FILE}" > /tmp/${WORKSTATION}-devcontainer-task-def.json
 
