@@ -70,20 +70,91 @@ echo "=== Decrypting secrets ==="
 SECRETS_JSON=$(sops -d --input-type yaml --output-type json "${SECRETS_FILE}" 2>/dev/null)
 
 HERMES_ENV=$(echo "${SECRETS_JSON}" | jq -r '.hermes_env')
+HERMES_ENV_SEP=$(echo "${SECRETS_JSON}" | jq -r '.hermes_env_separator')
 AWS_CREDS=$(echo "${SECRETS_JSON}" | jq -r '.aws_credentials')
 
 echo "=== Writing secrets to EBS ==="
+
+# Base64 encode to avoid escaping issues in SSM JSON
+ENV_B64=$(echo -n "${HERMES_ENV}" | base64)
+SEP_B64=$(echo -n "${HERMES_ENV_SEP}" | base64)
+CREDS_B64=$(echo -n "${AWS_CREDS}" | base64)
+
+# Python script that handles the separator logic
+PY_SCRIPT=$(cat << 'PYEOF'
+import os, base64
+env_b64 = os.environ['ENV_B64']
+sep_b64 = os.environ['SEP_B64']
+creds_b64 = os.environ['CREDS_B64']
+
+env_content = base64.b64decode(env_b64).decode()
+sep = base64.b64decode(sep_b64).decode()
+creds = base64.b64decode(creds_b64).decode()
+
+env_file = '/mnt/workstation/.hermes/.env'
+creds_file = '/mnt/workstation/.aws/credentials'
+
+os.makedirs('/mnt/workstation/.hermes', exist_ok=True)
+os.makedirs('/mnt/workstation/.aws', exist_ok=True)
+
+# Handle .env with separator
+if os.path.exists(env_file):
+    with open(env_file) as f:
+        lines = f.readlines()
+else:
+    lines = []
+
+# Find separator, remove everything after it
+new_lines = []
+found = False
+for line in lines:
+    if line.rstrip('\n') == sep:
+        found = True
+        break
+    new_lines.append(line)
+
+if not found:
+    if new_lines and new_lines[-1].strip():
+        new_lines.append('\n')
+    new_lines.append(sep + '\n')
+
+new_lines.append(env_content)
+if not env_content.endswith('\n'):
+    new_lines.append('\n')
+
+with open(env_file, 'w') as f:
+    f.writelines(new_lines)
+
+# Write AWS credentials (full overwrite)
+with open(creds_file, 'w') as f:
+    f.write(creds)
+    if not creds.endswith('\n'):
+        f.write('\n')
+
+os.system('chown -R 1000:1000 /mnt/workstation/.hermes /mnt/workstation/.aws 2>/dev/null || true')
+os.system('chmod 600 /mnt/workstation/.aws/credentials /mnt/workstation/.hermes/.env')
+
+print("=== verification ===")
+with open(env_file) as f:
+    content = f.read()
+print(f".env lines: {content.count(chr(10))}")
+print("First 5 lines:")
+for l in content.split(chr(10))[:5]:
+    print(f"  {l}")
+print("Last 3 lines:")
+for l in content.strip().split(chr(10))[-3:]:
+    print(f"  {l}")
+PYEOF
+)
+
+PY_B64=$(echo -n "${PY_SCRIPT}" | base64)
+
 aws ssm send-command \
     --instance-ids "${EC2_INSTANCE}" \
     --document-name "AWS-RunShellScript" \
     --parameters "commands=[
         \"mkdir -p /mnt/workstation/.hermes /mnt/workstation/.aws\",
-        \"cat > /mnt/workstation/.hermes/.env << 'ENVEOF'\n${HERMES_ENV}\nENVEOF\",
-        \"cat > /mnt/workstation/.aws/credentials << 'AWSEOF'\n${AWS_CREDS}\nAWSEOF\",
-        \"chown -R 1000:1000 /mnt/workstation/.hermes /mnt/workstation/.aws 2>/dev/null || true\",
-        \"chmod 600 /mnt/workstation/.aws/credentials /mnt/workstation/.hermes/.env\",
-        \"echo '=== verification ==='\",
-        \"ls -la /mnt/workstation/.hermes/.env /mnt/workstation/.aws/credentials\"
+        \"ENV_B64='${ENV_B64}' SEP_B64='${SEP_B64}' CREDS_B64='${CREDS_B64}' python3 -c \\\"\\$(printf '%s' '${PY_B64}' | base64 -d)\\\"\"
     ]" \
     --region ap-south-1 \
     --profile "${AWS_PROFILE}" \
