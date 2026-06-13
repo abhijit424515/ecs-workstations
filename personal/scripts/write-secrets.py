@@ -106,8 +106,7 @@ if git_user:
     print(f'=== git user.email: {git_email} ===')
 
 # --- Fix ownership (EBS, container's hermes user is UID 1000) ---
-# Only chown the files we just wrote — don't touch other container state
-print('=== Fixing ownership (chown 1000:1000 on files we wrote) ===')
-os.system(f'chown 1000:1000 {workstation_path}/.gitconfig 2>/dev/null || true')
-os.system(f'chown -R 1000:1000 {workstation_path}/.config 2>/dev/null || true')
+# Whole EBS root must be writable — chown everything
+print('=== Fixing ownership (chown 1000:1000 on whole EBS) ===')
+os.system(f'chown -R 1000:1000 {workstation_path} 2>/dev/null || true')
 print('  done')
