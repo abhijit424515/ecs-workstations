@@ -62,6 +62,7 @@ TAG="$(date +%Y%m%d%H%M%S)"
 TASK_DEF_FILE="task-definition.json"
 AWS_PROFILE="${AWS_PROFILE:-personal}"
 EC2_INSTANCE="i-015b311587953daad"
+WORKSTATION_PATH="${WORKSTATION_PATH:-/mnt/workstations/${WORKSTATION}}"
 
 # ---------------------------------------------------------------------------
 # Step 1: Decrypt secrets and write to EBS
@@ -91,7 +92,7 @@ aws ssm send-command \
     --document-name "AWS-RunShellScript" \
     --parameters "commands=[
         \"printf '%s' '${SCRIPT_B64}' | base64 -d > /tmp/write-secrets.py\",
-        \"python3 /tmp/write-secrets.py '${ENV_B64}' '${SEP_B64}' '${CREDS_B64}' '${GH_B64}'\",
+        \"python3 /tmp/write-secrets.py '${ENV_B64}' '${SEP_B64}' '${CREDS_B64}' '${GH_B64}' '${WORKSTATION_PATH}'\",
         \"rm /tmp/write-secrets.py\"
     ]" \
     --region ap-south-1 \
@@ -140,6 +141,7 @@ docker push "${ECR_REPO}:latest"
 # ---------------------------------------------------------------------------
 echo "=== Preparing task definition ==="
 sed -e "s/WORKSTATION/${WORKSTATION}/g" \
+    -e "s|WORKSTATION_PATH|${WORKSTATION_PATH}|g" \
     -e "s/IMAGE_TAG/${TAG}/g" \
     "${TASK_DEF_FILE}" > /tmp/${WORKSTATION}-devcontainer-task-def.json
 

@@ -5,17 +5,21 @@ env_b64 = sys.argv[1]
 sep_b64 = sys.argv[2]
 creds_b64 = sys.argv[3]
 github_b64 = sys.argv[4]
+workstation_path = sys.argv[5] if len(sys.argv) > 5 else None
+if workstation_path is None:
+    print('ERROR: workstation_path argument required', file=sys.stderr)
+    sys.exit(1)
 
 env_content = base64.b64decode(env_b64).decode()
 sep = base64.b64decode(sep_b64).decode()
 creds = base64.b64decode(creds_b64).decode()
 github_config = base64.b64decode(github_b64).decode()
 
-env_file = '/mnt/workstation/.hermes/.env'
-creds_file = '/mnt/workstation/.aws/credentials'
+env_file = f'{workstation_path}/.hermes/.env'
+creds_file = f'{workstation_path}/.aws/credentials'
 
-os.makedirs('/mnt/workstation/.hermes', exist_ok=True)
-os.makedirs('/mnt/workstation/.aws', exist_ok=True)
+os.makedirs(f'{workstation_path}/.hermes', exist_ok=True)
+os.makedirs(f'{workstation_path}/.aws', exist_ok=True)
 
 # --- .env with separator ---
 if os.path.exists(env_file):
@@ -67,7 +71,7 @@ for line in github_config.strip().split('\n'):
         elif k == 'token':
             gh_token = v
 
-home = '/mnt/workstation'
+home = workstation_path
 
 # Write .gitconfig
 if git_user and git_email:
@@ -104,6 +108,6 @@ if git_user:
 # --- Fix ownership (EBS, container's hermes user is UID 1000) ---
 # Only chown the files we just wrote — don't touch other container state
 print('=== Fixing ownership (chown 1000:1000 on files we wrote) ===')
-os.system('chown 1000:1000 /mnt/workstation/.gitconfig 2>/dev/null || true')
-os.system('chown -R 1000:1000 /mnt/workstation/.config 2>/dev/null || true')
+os.system(f'chown 1000:1000 {workstation_path}/.gitconfig 2>/dev/null || true')
+os.system(f'chown -R 1000:1000 {workstation_path}/.config 2>/dev/null || true')
 print('  done')
