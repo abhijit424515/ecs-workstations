@@ -1,0 +1,43 @@
+{
+  "family": "WORKSTATION-devcontainer",
+  "networkMode": "host",
+  "containerDefinitions": [
+    {
+      "name": "devcontainer",
+      "image": "public.ecr.aws/l0b6e2f4/WORKSTATION-devcontainer:IMAGE_TAG",
+      "essential": true,
+      "memoryReservation": 1024,
+      "cpu": 512,
+      "environment": [
+        { "name": "AWS_DEFAULT_REGION", "value": "ap-south-1" }
+      ],
+      "mountPoints": [
+        { "sourceVolume": "workspace",      "containerPath": "/home/hermes" },
+        { "sourceVolume": "docker-socket",  "containerPath": "/var/run/docker.sock", "readOnly": false }
+      ],
+      "linuxParameters": {
+        "capabilities": {
+          "add": ["SYS_ADMIN"]
+        }
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/WORKSTATION-devcontainer",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    { "name": "workspace",     "host": { "sourcePath": "/mnt/workstation" } },
+    { "name": "docker-socket", "host": { "sourcePath": "/var/run/docker.sock" } }
+  ],
+  "requiresCompatibilities": ["EC2"],
+  "tags": [
+    { "key": "Name",        "value": "WORKSTATION-devcontainer" },
+    { "key": "Environment", "value": "devcontainer" }
+  ]
+}
