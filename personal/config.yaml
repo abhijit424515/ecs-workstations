@@ -1,0 +1,43 @@
+# =============================================================================
+# Hermes Agent Configuration — Personal Remote Workstation
+# =============================================================================
+# Telegram config goes in .env (TELEGRAM_BOT_TOKEN).
+# API keys go in .env (DEEPSEEK_API_KEY).
+# =============================================================================
+
+model:
+  default: deepseek-v4-flash
+  provider: deepseek
+  base_url: https://api.deepseek.com/v1
+
+providers: {}
+
+tools:
+  terminal:
+    enabled: true
+  file:
+    enabled: true
+  web:
+    enabled: true
+  session_search:
+    enabled: true
+  memory:
+    enabled: true
+  cronjob:
+    enabled: true
+  skills:
+    enabled: true
+  delegate_task:
+    enabled: true
+  execute_code:
+    enabled: true
+
+skills:
+  on_start:
+    - t2v-aws-deployment
+    - github-pr-workflow
+    - github-code-review
+    - database-schema-migration
+
+telegram:
+  parse_mode: markdown
