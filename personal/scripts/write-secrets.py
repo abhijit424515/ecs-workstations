@@ -50,9 +50,6 @@ with open(creds_file, 'w') as f:
     if not creds.endswith('\n'):
         f.write('\n')
 
-os.system('chown -R 1000:1000 /mnt/workstation/.hermes /mnt/workstation/.aws 2>/dev/null || true')
-os.system('chmod 600 /mnt/workstation/.aws/credentials /mnt/workstation/.hermes/.env')
-
 # --- GitHub config (write to EBS, container picks up from home) ---
 git_user = None
 git_email = None
@@ -103,3 +100,10 @@ print(c[:80])
 if git_user:
     print(f'=== git user.name: {git_user} ===')
     print(f'=== git user.email: {git_email} ===')
+
+# --- Fix ownership (EBS, container's hermes user is UID 1000) ---
+# Only chown the files we just wrote — don't touch other container state
+print('=== Fixing ownership (chown 1000:1000 on files we wrote) ===')
+os.system('chown 1000:1000 /mnt/workstation/.gitconfig 2>/dev/null || true')
+os.system('chown -R 1000:1000 /mnt/workstation/.config 2>/dev/null || true')
+print('  done')
