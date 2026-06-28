@@ -27,7 +27,11 @@ sudo chown hermes:hermes "${WORKSPACE}"
 # Start SSM agent for ECS Exec
 # ---------------------------------------------------------------------------
 echo "[entrypoint] Starting SSM agent..."
-sudo systemctl start amazon-ssm-agent
+if [ -f /usr/bin/amazon-ssm-agent ] || [ -f /opt/amazon/ssm/bin/amazon-ssm-agent ]; then
+    sudo service amazon-ssm-agent start 2>/dev/null || sudo /usr/bin/amazon-ssm-agent -register -code "${AWS_SSM_ACTIVATION_CODE:-}" -id "${AWS_SSM_ACTIVATION_ID:-}" -region "${AWS_DEFAULT_REGION:-ap-south-1}" &
+else
+    echo "[entrypoint] Warning: SSM agent not found"
+fi
 
 # ---------------------------------------------------------------------------
 # Validate that secrets exist on EBS (pre-written by build script)
