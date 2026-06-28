@@ -27,14 +27,6 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
-# SSM agent for ECS Exec (ARM64)
-# =============================================================================
-RUN curl -fsSL "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/debian_arm64/amazon-ssm-agent.deb" \
-    -o /tmp/amazon-ssm-agent.deb && \
-    dpkg -i /tmp/amazon-ssm-agent.deb && \
-    rm /tmp/amazon-ssm-agent.deb
-
-# =============================================================================
 # AWS CLI v2 (ARM64)
 # =============================================================================
 RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" \

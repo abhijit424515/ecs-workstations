@@ -180,6 +180,7 @@ if [ "${SERVICE_EXISTS}" = "ACTIVE" ]; then
         --cluster "${CLUSTER}" \
         --service "${SERVICE}" \
         --task-definition "${WORKSTATION}-devcontainer" \
+        --enable-execute-command \
         --force-new-deployment \
         --profile "${AWS_PROFILE}" \
         --output json
@@ -191,6 +192,7 @@ else
         --task-definition "${WORKSTATION}-devcontainer" \
         --desired-count 1 \
         --launch-type EC2 \
+        --enable-execute-command \
         --profile "${AWS_PROFILE}" \
         --output json
 fi
