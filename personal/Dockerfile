@@ -11,7 +11,7 @@
 FROM python:3.11-slim
 
 # =============================================================================
-# System dependencies (includes Docker CLI)
+# System dependencies (includes Docker CLI + SSM agent for ECS Exec)
 # =============================================================================
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     curl \
@@ -24,6 +24,7 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     nfs-common \
     docker.io \
     sudo \
+    amazon-ssm-agent \
     && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================

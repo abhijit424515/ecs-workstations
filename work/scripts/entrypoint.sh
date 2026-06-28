@@ -24,6 +24,12 @@ echo "[entrypoint] Ensuring workspace ownership..."
 sudo chown hermes:hermes "${WORKSPACE}"
 
 # ---------------------------------------------------------------------------
+# Start SSM agent for ECS Exec
+# ---------------------------------------------------------------------------
+echo "[entrypoint] Starting SSM agent..."
+sudo systemctl start amazon-ssm-agent
+
+# ---------------------------------------------------------------------------
 # Validate that secrets exist on EBS (pre-written by build script)
 # ---------------------------------------------------------------------------
 if [ ! -f "/home/hermes/.hermes/.env" ]; then
