@@ -82,6 +82,8 @@ ENV_B64=$(echo -n "${HERMES_ENV}" | base64)
 SEP_B64=$(echo -n "${HERMES_ENV_SEP}" | base64)
 CREDS_B64=$(echo -n "${AWS_CREDS}" | base64)
 GH_B64=$(echo -n "${GITHUB_CONFIG}" | base64)
+# config.yaml is image-independent now: written to EBS so edits land without a rebuild
+CONFIG_B64=$(base64 < config.yaml | tr -d '\n')
 
 # Upload write-secrets.py to EC2 and execute it
 SCRIPT_PATH="${SCRIPT_DIR}/personal/scripts/write-secrets.py"
@@ -92,7 +94,7 @@ aws ssm send-command \
     --document-name "AWS-RunShellScript" \
     --parameters "commands=[
         \"printf '%s' '${SCRIPT_B64}' | base64 -d > /tmp/write-secrets.py\",
-        \"python3 /tmp/write-secrets.py '${ENV_B64}' '${SEP_B64}' '${CREDS_B64}' '${GH_B64}' '${WORKSTATION_PATH}'\",
+        \"python3 /tmp/write-secrets.py '${ENV_B64}' '${SEP_B64}' '${CREDS_B64}' '${GH_B64}' '${WORKSTATION_PATH}' '${CONFIG_B64}'\",
         \"rm /tmp/write-secrets.py\"
     ]" \
     --region ap-south-1 \

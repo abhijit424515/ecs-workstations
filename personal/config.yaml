@@ -6,9 +6,9 @@
 # =============================================================================
 
 model:
-  default: deepseek-v4-flash
-  provider: deepseek
-  base_url: https://api.deepseek.com/v1
+  default: deepseek-v4-pro
+  provider: opencode-go
+  base_url: https://opencode.ai/zen/go/v1
 
 providers: {}
 

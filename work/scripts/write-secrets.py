@@ -9,6 +9,7 @@ workstation_path = sys.argv[5] if len(sys.argv) > 5 else None
 if workstation_path is None:
     print('ERROR: workstation_path argument required', file=sys.stderr)
     sys.exit(1)
+config_b64 = sys.argv[6] if len(sys.argv) > 6 else None
 
 env_content = base64.b64decode(env_b64).decode()
 sep = base64.b64decode(sep_b64).decode()
@@ -44,6 +45,13 @@ if not env_content.endswith('\n'):
 
 with open(env_file, 'w') as f:
     f.writelines(new_lines)
+
+# --- Hermes config.yaml (overwrite each deploy; EBS mount masks the image copy) ---
+if config_b64:
+    config = base64.b64decode(config_b64).decode()
+    with open(f'{workstation_path}/.hermes/config.yaml', 'w') as f:
+        f.write(config)
+    print('  .hermes/config.yaml written')
 
 # --- AWS credentials ---
 with open(creds_file, 'w') as f:

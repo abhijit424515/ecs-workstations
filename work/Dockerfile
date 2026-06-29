@@ -72,11 +72,10 @@ RUN groupadd --gid 1000 hermes && \
     echo "hermes ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/hermes
 
 # =============================================================================
-# Hermes config template — installed at image build time
-# Customize or override with env vars at runtime
+# Hermes config.yaml is NOT baked into the image: the EBS bind-mount over
+# /home/hermes would mask it anyway. build-and-deploy.sh writes it to EBS via
+# write-secrets.py, so config edits land without an image rebuild.
 # =============================================================================
-COPY config.yaml /home/hermes/.hermes/config.yaml
-RUN chown -R hermes:hermes /home/hermes/.hermes
 
 # =============================================================================
 # Entrypoint
