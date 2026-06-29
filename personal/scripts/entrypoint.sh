@@ -30,6 +30,33 @@ sudo chown hermes:hermes "${WORKSPACE}"
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Homebrew — installed here (not in the image) because it lives at
+# /home/linuxbrew, outside the persistent /home/hermes EBS mount, so it is
+# wiped on every fresh container and must be reinstalled at start.
+# ponytail: reinstalls each cold start; move to image if boot time matters.
+# ---------------------------------------------------------------------------
+if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    echo "[entrypoint] Installing Homebrew..."
+    NONINTERACTIVE=1 /bin/bash -c \
+        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+# Load brew into this shell + persist for interactive shells (~/.bashrc on EBS)
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+if ! grep -q 'brew shellenv' "${HOME}/.bashrc" 2>/dev/null; then
+    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> "${HOME}/.bashrc"
+fi
+
+# ---------------------------------------------------------------------------
+# Claude Code — installs to ~/.local/bin, which IS on the persistent EBS
+# mount, so this runs once ever (guard skips it on subsequent starts).
+# ---------------------------------------------------------------------------
+if [ ! -x "${HOME}/.local/bin/claude" ]; then
+    echo "[entrypoint] Installing Claude Code..."
+    curl -fsSL https://claude.ai/install.sh | bash
+fi
+case ":${PATH}:" in *":${HOME}/.local/bin:"*) ;; *) export PATH="${HOME}/.local/bin:${PATH}";; esac
+
+# ---------------------------------------------------------------------------
 # Validate that secrets exist on EBS (pre-written by build script)
 # ---------------------------------------------------------------------------
 if [ ! -f "/home/hermes/.hermes/.env" ]; then

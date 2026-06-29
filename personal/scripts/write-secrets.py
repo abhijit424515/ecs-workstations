@@ -28,19 +28,16 @@ if os.path.exists(env_file):
 else:
     lines = []
 
+# Keep everything above the separator; replace the separator + everything below.
 new_lines = []
-found = False
 for line in lines:
     if line.rstrip('\n') == sep:
-        found = True
         break
     new_lines.append(line)
 
-if not found:
-    if new_lines and new_lines[-1].strip():
-        new_lines.append('\n')
-    new_lines.append(sep + '\n')
-
+if new_lines and new_lines[-1].strip():
+    new_lines.append('\n')
+new_lines.append(sep + '\n')
 new_lines.append(env_content)
 if not env_content.endswith('\n'):
     new_lines.append('\n')
